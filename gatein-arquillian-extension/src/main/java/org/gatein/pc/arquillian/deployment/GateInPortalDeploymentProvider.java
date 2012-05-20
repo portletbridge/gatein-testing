@@ -21,10 +21,13 @@
  */
 package org.gatein.pc.arquillian.deployment;
 
-import java.util.Collection;
+import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.jboss.arquillian.portal.spi.container.deployment.PortalContainerDeploymentProvider;
 import org.jboss.shrinkwrap.api.Archive;
+import org.jboss.shrinkwrap.api.ShrinkWrap;
 import org.jboss.shrinkwrap.api.spec.WebArchive;
 import org.jboss.shrinkwrap.resolver.api.DependencyResolvers;
 import org.jboss.shrinkwrap.resolver.api.maven.MavenDependencyResolver;
@@ -39,11 +42,30 @@ public class GateInPortalDeploymentProvider implements PortalContainerDeployment
      */
     @Override
     public Archive<?> build() {
-        Collection<WebArchive> portalContainer = DependencyResolvers.use(MavenDependencyResolver.class)
+        List<WebArchive> gateinPortalContainerArchives = new ArrayList<WebArchive>();
+
+        // get all maven dependencies
+        File[] artifacts = DependencyResolvers.use(MavenDependencyResolver.class)
                 .loadEffectivePom("pom.xml")
-                .artifact("org.jboss.portletbridge.testing.gatein:gatein-portal-container:war:jboss-as7:1.0.0.Alpha1")
-                .resolveAs(WebArchive.class);
-        return portalContainer.iterator().next();
+                .importAllDependencies()
+                .resolveAsFiles();
+
+        // look for gatein-portal-container artifacts
+        for(File artifactFile : artifacts) {
+            String fileName = artifactFile.getName();
+            if(fileName.startsWith("gatein-portal-container") && fileName.endsWith(".war")) {
+                gateinPortalContainerArchives.add(ShrinkWrap.createFromZipFile(WebArchive.class, artifactFile));
+            }
+        }
+
+        if(gateinPortalContainerArchives.isEmpty()) {
+            throw new RuntimeException("No gatein-portal-container artifact found");
+        }
+        if(gateinPortalContainerArchives.size() > 1) {
+            throw new RuntimeException("Multiple gatein-portal-container artifacts found");
+        }
+
+        return gateinPortalContainerArchives.iterator().next();
     }
 
 }
